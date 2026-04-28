@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,6 +20,7 @@ import {
   Clock3,
   Database,
   CheckCircle2,
+  FileSpreadsheet,
 } from "lucide-react";
 
 const TIMER_KEYS = [
@@ -51,9 +52,32 @@ const TIMER_KEYS = [
     prompt:
       "Promedio de horas invertidas estimadas a la semana en comunicación con estudiantes (mensajes, foros, correos, tutorías, retroalimentación, etc.)",
   },
-];
+] as const;
 
-const STORAGE_KEY = "esfuerzo_docente_registros_v2";
+const STORAGE_KEY = "esfuerzo_docente_registros_v5";
+
+type TimerState = {
+  elapsed: number;
+  isRunning: boolean;
+};
+
+type TimerMap = Record<string, TimerState>;
+
+type RecordItem = {
+  id: string;
+  createdAt: string;
+  teacherName: string | null;
+  teacherEmail: string | null;
+  courseName: string | null;
+  totalMeasuredSeconds: number;
+  totalMeasuredHours: number;
+  timers: {
+    id: string;
+    question: string;
+    measuredSeconds: number;
+    measuredHours: number;
+  }[];
+};
 
 function formatSeconds(totalSeconds: number) {
   const hours = Math.floor(totalSeconds / 3600);
@@ -69,18 +93,11 @@ function toHours(seconds: number) {
   return Number((seconds / 3600).toFixed(2));
 }
 
-function differenceLabel(measured: number, manual: number) {
-  const diff = Number((measured - manual).toFixed(2));
-  if (diff === 0) return "Coincide con el formulario";
-  if (diff > 0) return `+${diff} h frente al formulario`;
-  return `${diff} h frente al formulario`;
-}
-
-function buildEmptyTimers() {
+function buildEmptyTimers(): TimerMap {
   return Object.fromEntries(
     TIMER_KEYS.map((item) => [
       item.id,
-      { elapsed: 0, isRunning: false, manualHours: "", notes: "" },
+      { elapsed: 0, isRunning: false },
     ])
   );
 }
@@ -94,24 +111,16 @@ type TimerCardProps = {
   };
   elapsed: number;
   isRunning: boolean;
-  manualHours: string;
-  notes: string;
   onStartPause: () => void;
   onReset: () => void;
-  onManualChange: (id: string, value: string) => void;
-  onNotesChange: (id: string, value: string) => void;
 };
 
 function TimerCard({
   item,
   elapsed,
   isRunning,
-  manualHours,
-  notes,
   onStartPause,
   onReset,
-  onManualChange,
-  onNotesChange,
 }: TimerCardProps) {
   const measuredHours = toHours(elapsed);
 
@@ -154,80 +163,28 @@ function TimerCard({
           </Button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Horas reportadas en el formulario</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.1"
-              value={manualHours}
-              onChange={(e) => onManualChange(item.id, e.target.value)}
-              placeholder="Ej. 4.5"
-              className="rounded-xl"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Horas medidas</Label>
-            <Input
-              value={String(measuredHours)}
-              readOnly
-              className="rounded-xl bg-slate-50"
-            />
-          </div>
-        </div>
-
         <div className="space-y-2">
-          <Label>Observaciones</Label>
-          <Textarea
-            value={notes}
-            onChange={(e) => onNotesChange(item.id, e.target.value)}
-            placeholder="Notas del docente o contexto de la medición"
-            className="min-h-[90px] rounded-xl"
+          <Label>Horas medidas</Label>
+          <Input
+            value={String(measuredHours)}
+            readOnly
+            className="rounded-xl bg-slate-50"
           />
         </div>
-
-        {manualHours !== "" && !Number.isNaN(Number(manualHours)) && (
-          <div className="rounded-xl border border-slate-200 p-3 text-sm text-slate-700">
-            {differenceLabel(measuredHours, Number(manualHours))}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
 }
 
-type RecordItem = {
-  id: string;
-  createdAt: string;
-  teacherName: string | null;
-  teacherEmail: string | null;
-  courseName: string | null;
-  weekLabel: string | null;
-  total_measured_seconds: number;
-  total_measured_hours: number;
-  total_form_hours: number;
-  timers: {
-    id: string;
-    question: string;
-    measured_seconds: number;
-    measured_hours: number;
-    form_hours: number | null;
-    notes: string | null;
-  }[];
-};
-
 export default function EffortTimerApp() {
   const [teacherName, setTeacherName] = useState("");
   const [teacherEmail, setTeacherEmail] = useState("");
   const [courseName, setCourseName] = useState("");
-  const [weekLabel, setWeekLabel] = useState("");
   const [status, setStatus] = useState("");
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [saving, setSaving] = useState(false);
   const [records, setRecords] = useState<RecordItem[]>([]);
-  const [timers, setTimers] = useState(buildEmptyTimers);
+  const [timers, setTimers] = useState<TimerMap>(buildEmptyTimers);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -242,7 +199,7 @@ export default function EffortTimerApp() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimers((current: any) => {
+      setTimers((current) => {
         const next = { ...current };
         let changed = false;
 
@@ -273,40 +230,17 @@ export default function EffortTimerApp() {
     [timers]
   );
 
-  const totalManualHours = useMemo(
-    () =>
-      TIMER_KEYS.reduce((acc, item) => {
-        const value = Number(timers[item.id].manualHours);
-        return acc + (Number.isNaN(value) ? 0 : value);
-      }, 0),
-    [timers]
-  );
-
   function handleStartPause(id: string) {
-    setTimers((current: any) => ({
+    setTimers((current) => ({
       ...current,
       [id]: { ...current[id], isRunning: !current[id].isRunning },
     }));
   }
 
   function handleReset(id: string) {
-    setTimers((current: any) => ({
+    setTimers((current) => ({
       ...current,
       [id]: { ...current[id], elapsed: 0, isRunning: false },
-    }));
-  }
-
-  function handleManualChange(id: string, value: string) {
-    setTimers((current: any) => ({
-      ...current,
-      [id]: { ...current[id], manualHours: value },
-    }));
-  }
-
-  function handleNotesChange(id: string, value: string) {
-    setTimers((current: any) => ({
-      ...current,
-      [id]: { ...current[id], notes: value },
     }));
   }
 
@@ -315,7 +249,6 @@ export default function EffortTimerApp() {
     setTeacherName("");
     setTeacherEmail("");
     setCourseName("");
-    setWeekLabel("");
     setStatus("Sesión reiniciada.");
   }
 
@@ -324,20 +257,13 @@ export default function EffortTimerApp() {
       teacher_name: teacherName || null,
       teacher_email: teacherEmail || null,
       course_name: courseName || null,
-      week_label: weekLabel || null,
       total_measured_seconds: totalMeasuredSeconds,
       total_measured_hours: toHours(totalMeasuredSeconds),
-      total_form_hours: Number(totalManualHours.toFixed(2)),
       details: TIMER_KEYS.map((item) => ({
         question_code: item.id,
         question_text: item.prompt,
         measured_seconds: timers[item.id].elapsed,
         measured_hours: toHours(timers[item.id].elapsed),
-        form_hours:
-          timers[item.id].manualHours === ""
-            ? null
-            : Number(timers[item.id].manualHours),
-        notes: timers[item.id].notes || null,
       })),
     };
   }
@@ -357,18 +283,14 @@ export default function EffortTimerApp() {
         teacher_name,
         teacher_email,
         course_name,
-        week_label,
         total_measured_seconds,
         total_measured_hours,
-        total_form_hours,
         medicion_detalle (
           id,
           question_code,
           question_text,
           measured_seconds,
-          measured_hours,
-          form_hours,
-          notes
+          measured_hours
         )
       `
       )
@@ -387,17 +309,13 @@ export default function EffortTimerApp() {
       teacherName: row.teacher_name,
       teacherEmail: row.teacher_email,
       courseName: row.course_name,
-      weekLabel: row.week_label,
-      total_measured_seconds: row.total_measured_seconds,
-      total_measured_hours: row.total_measured_hours,
-      total_form_hours: row.total_form_hours,
+      totalMeasuredSeconds: row.total_measured_seconds,
+      totalMeasuredHours: row.total_measured_hours,
       timers: (row.medicion_detalle || []).map((detail: any) => ({
         id: detail.question_code,
         question: detail.question_text,
-        measured_seconds: detail.measured_seconds,
-        measured_hours: detail.measured_hours,
-        form_hours: detail.form_hours,
-        notes: detail.notes,
+        measuredSeconds: detail.measured_seconds,
+        measuredHours: detail.measured_hours,
       })),
     }));
 
@@ -417,17 +335,13 @@ export default function EffortTimerApp() {
         teacherName,
         teacherEmail,
         courseName,
-        weekLabel,
-        total_measured_seconds: payload.total_measured_seconds,
-        total_measured_hours: payload.total_measured_hours,
-        total_form_hours: payload.total_form_hours,
+        totalMeasuredSeconds: payload.total_measured_seconds,
+        totalMeasuredHours: payload.total_measured_hours,
         timers: payload.details.map((detail) => ({
           id: detail.question_code,
           question: detail.question_text,
-          measured_seconds: detail.measured_seconds,
-          measured_hours: detail.measured_hours,
-          form_hours: detail.form_hours,
-          notes: detail.notes,
+          measuredSeconds: detail.measured_seconds,
+          measuredHours: detail.measured_hours,
         })),
       };
 
@@ -445,10 +359,8 @@ export default function EffortTimerApp() {
         teacher_name: payload.teacher_name,
         teacher_email: payload.teacher_email,
         course_name: payload.course_name,
-        week_label: payload.week_label,
         total_measured_seconds: payload.total_measured_seconds,
         total_measured_hours: payload.total_measured_hours,
-        total_form_hours: payload.total_form_hours,
       })
       .select()
       .single();
@@ -465,8 +377,6 @@ export default function EffortTimerApp() {
       question_text: detail.question_text,
       measured_seconds: detail.measured_seconds,
       measured_hours: detail.measured_hours,
-      form_hours: detail.form_hours,
-      notes: detail.notes,
     }));
 
     const { error: detailError } = await supabase
@@ -520,6 +430,27 @@ export default function EffortTimerApp() {
     URL.revokeObjectURL(url);
   }
 
+  function exportExcel() {
+    const rows = records.flatMap((record) =>
+      record.timers.map((timer) => ({
+        fecha_registro: record.createdAt,
+        docente: record.teacherName || "",
+        correo_docente: record.teacherEmail || "",
+        curso: record.courseName || "",
+        pregunta: timer.id.toUpperCase(),
+        descripcion: timer.question,
+        tiempo_segundos: timer.measuredSeconds,
+        tiempo_horas: timer.measuredHours,
+        total_medicion_horas: record.totalMeasuredHours,
+      }))
+    );
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Mediciones");
+    XLSX.writeFile(workbook, "registros_esfuerzo_docente.xlsx");
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -550,11 +481,11 @@ export default function EffortTimerApp() {
               </CardTitle>
               <p className="text-sm text-slate-600 md:text-base">
                 Cronometra las preguntas 31, 32, 33 y 34, guarda la medición directa
-                del docente y compárala con las respuestas del formulario.
+                del docente y expórtala para su análisis posterior.
               </p>
             </CardHeader>
 
-            <CardContent className="grid gap-4 md:grid-cols-2">
+            <CardContent className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label>Nombre del docente</Label>
                 <Input
@@ -567,10 +498,11 @@ export default function EffortTimerApp() {
               <div className="space-y-2">
                 <Label>Correo del docente</Label>
                 <Input
+                  type="email"
                   value={teacherEmail}
                   onChange={(e) => setTeacherEmail(e.target.value)}
-                  className="rounded-xl"
                   placeholder="docente@correo.com"
+                  className="rounded-xl"
                 />
               </div>
 
@@ -579,16 +511,6 @@ export default function EffortTimerApp() {
                 <Input
                   value={courseName}
                   onChange={(e) => setCourseName(e.target.value)}
-                  className="rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Semana o periodo medido</Label>
-                <Input
-                  value={weekLabel}
-                  onChange={(e) => setWeekLabel(e.target.value)}
-                  placeholder="Ej. Semana 3"
                   className="rounded-xl"
                 />
               </div>
@@ -611,20 +533,6 @@ export default function EffortTimerApp() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">Total reportado en formulario</div>
-                <div className="mt-1 text-3xl font-semibold">
-                  {Number(totalManualHours.toFixed(2))} h
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">Diferencia total</div>
-                <div className="mt-1 text-3xl font-semibold">
-                  {Number((toHours(totalMeasuredSeconds) - totalManualHours).toFixed(2))} h
-                </div>
-              </div>
-
               <div className="flex flex-wrap gap-2">
                 <Button onClick={saveRecord} className="rounded-2xl" disabled={saving}>
                   <Save className="mr-2 h-4 w-4" />
@@ -634,6 +542,11 @@ export default function EffortTimerApp() {
                 <Button variant="outline" onClick={exportJson} className="rounded-2xl">
                   <Download className="mr-2 h-4 w-4" />
                   Exportar JSON
+                </Button>
+
+                <Button variant="outline" onClick={exportExcel} className="rounded-2xl">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Exportar Excel
                 </Button>
 
                 <Button variant="outline" onClick={resetAll} className="rounded-2xl">
@@ -654,12 +567,8 @@ export default function EffortTimerApp() {
               item={item}
               elapsed={timers[item.id].elapsed}
               isRunning={timers[item.id].isRunning}
-              manualHours={timers[item.id].manualHours}
-              notes={timers[item.id].notes}
               onStartPause={() => handleStartPause(item.id)}
               onReset={() => handleReset(item.id)}
-              onManualChange={handleManualChange}
-              onNotesChange={handleNotesChange}
             />
           ))}
         </div>
@@ -686,8 +595,7 @@ export default function EffortTimerApp() {
                         {record.teacherName || "Docente sin nombre"}
                       </div>
                       <div className="text-sm text-slate-600">
-                        {record.courseName || "Curso no especificado"} ·{" "}
-                        {record.weekLabel || "Periodo no especificado"}
+                        {record.courseName || "Curso no especificado"}
                       </div>
                       {record.teacherEmail && (
                         <div className="mt-1 text-sm text-slate-500">
@@ -697,8 +605,7 @@ export default function EffortTimerApp() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{record.total_measured_hours} h medidas</Badge>
-                      <Badge variant="outline">{record.total_form_hours} h formulario</Badge>
+                      <Badge>{record.totalMeasuredHours} h medidas</Badge>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -719,17 +626,8 @@ export default function EffortTimerApp() {
                           {timer.question}
                         </div>
                         <div className="mt-3 text-sm">
-                          Medido: <span className="font-medium">{timer.measured_hours} h</span>
+                          Medido: <span className="font-medium">{timer.measuredHours} h</span>
                         </div>
-                        <div className="text-sm">
-                          Formulario:{" "}
-                          <span className="font-medium">{timer.form_hours ?? "—"} h</span>
-                        </div>
-                        {timer.notes && (
-                          <div className="mt-2 text-xs text-slate-500">
-                            Nota: {timer.notes}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
