@@ -235,6 +235,7 @@ function getDraftStorageKey(userId: string) {
 type TimerState = {
   elapsed: number;
   isRunning: boolean;
+  startedAt: number | null;
 };
 
 type TimerMap = Record<string, TimerState>;
@@ -280,7 +281,7 @@ function buildEmptyTimers(): TimerMap {
   return Object.fromEntries(
     TIMER_KEYS.map((item) => [
       item.id,
-      { elapsed: 0, isRunning: false },
+      { elapsed: 0, isRunning: false, startedAt: null },
     ])
   );
 }
@@ -401,6 +402,7 @@ export default function EffortTimerApp() {
   const [selectedResponseId, setSelectedResponseId] = useState("");
   const [durationWeeks, setDurationWeeks] = useState(1);
   const [activeTimerSection, setActiveTimerSection] = useState("q30");
+  const [now, setNow] = useState(Date.now());
 
   function loadDraftForUser(currentUserId: string) {
     const savedDraft = localStorage.getItem(getDraftStorageKey(currentUserId));
@@ -429,6 +431,7 @@ export default function EffortTimerApp() {
             restoredTimers[item.id] = {
               elapsed: Number(draft.timers[item.id].elapsed || 0),
               isRunning: false,
+              startedAt: null,
             };
           }
         }
@@ -440,23 +443,36 @@ export default function EffortTimerApp() {
     }
   }
 
-  useEffect(() => {
+useEffect(() => {
   if (!userId) return;
 
-  const hasAnyTime = TIMER_KEYS.some((item) => timers[item.id].elapsed > 0);
+  const hasAnyTime = TIMER_KEYS.some(
+    (item) => getTimerElapsed(timers[item.id]) > 0
+  );
 
   if (!courseName && !selectedResponseId && !hasAnyTime) return;
+
+  const timersForDraft = Object.fromEntries(
+    TIMER_KEYS.map((item) => [
+      item.id,
+      {
+        elapsed: getTimerElapsed(timers[item.id]),
+        isRunning: timers[item.id].isRunning,
+        startedAt: timers[item.id].startedAt,
+      },
+    ])
+  );
 
   const draft = {
     courseName,
     selectedResponseId,
     durationWeeks,
-    timers,
+    timers: timersForDraft,
     updatedAt: new Date().toISOString(),
   };
 
   localStorage.setItem(getDraftStorageKey(userId), JSON.stringify(draft));
-}, [userId, courseName, selectedResponseId, durationWeeks, timers]);
+}, [userId, courseName, selectedResponseId, durationWeeks, timers, now]);
 
   useEffect(() => {
     loadAuthenticatedUser();
@@ -464,30 +480,27 @@ export default function EffortTimerApp() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimers((current) => {
-        const next = { ...current };
-        let changed = false;
-
-        for (const item of TIMER_KEYS) {
-          if (next[item.id].isRunning) {
-            next[item.id] = {
-              ...next[item.id],
-              elapsed: next[item.id].elapsed + 1,
-            };
-            changed = true;
-          }
-        }
-
-        return changed ? next : current;
-      });
+      setNow(Date.now());
     }, 1000);
 
     return () => clearInterval(interval);
   }, []);
 
+  function getTimerElapsed(timer: TimerState) {
+    if (!timer.isRunning || !timer.startedAt) {
+      return timer.elapsed;
+    }
+
+    return timer.elapsed + Math.floor((now - timer.startedAt) / 1000);
+  }
+
   const totalMeasuredSeconds = useMemo(
-    () => TIMER_KEYS.reduce((acc, item) => acc + timers[item.id].elapsed, 0),
-    [timers]
+    () =>
+      TIMER_KEYS.reduce(
+        (acc, item) => acc + getTimerElapsed(timers[item.id]),
+        0
+      ),
+    [timers, now]
   );
 
   const activeTimerId = useMemo(() => {
@@ -665,16 +678,41 @@ export default function EffortTimerApp() {
   }
 
   function handleStartPause(id: string) {
-    setTimers((current) => ({
-      ...current,
-      [id]: { ...current[id], isRunning: !current[id].isRunning },
-    }));
+    setTimers((current) => {
+      const selectedTimer = current[id];
+
+      if (selectedTimer.isRunning) {
+        return {
+          ...current,
+          [id]: {
+            ...selectedTimer,
+            elapsed: getTimerElapsed(selectedTimer),
+            isRunning: false,
+            startedAt: null,
+          },
+        };
+      }
+
+      return {
+        ...current,
+        [id]: {
+          ...selectedTimer,
+          isRunning: true,
+          startedAt: Date.now(),
+        },
+      };
+    });
   }
 
   function handleReset(id: string) {
     setTimers((current) => ({
       ...current,
-      [id]: { ...current[id], elapsed: 0, isRunning: false },
+      [id]: {
+        ...current[id],
+        elapsed: 0,
+        isRunning: false,
+        startedAt: null,
+      },
     }));
   }
 
@@ -701,8 +739,8 @@ export default function EffortTimerApp() {
       details: TIMER_KEYS.map((item) => ({
         question_code: item.id,
         question_text: item.prompt,
-        measured_seconds: timers[item.id].elapsed,
-        measured_hours: toHours(timers[item.id].elapsed),
+        measured_seconds: getTimerElapsed(timers[item.id]),
+        measured_hours: toHours(getTimerElapsed(timers[item.id])),
       })),
     };
   }
@@ -1256,7 +1294,7 @@ async function exportAllExcel() {
                       <TimerCard
                         key={item.id}
                         item={item}
-                        elapsed={timers[item.id].elapsed}
+                        elapsed={getTimerElapsed(timers[item.id])}
                         isRunning={timers[item.id].isRunning}
                         isBlocked={activeTimerId !== null && activeTimerId !== item.id}
                         onStartPause={() => handleStartPause(item.id)}
