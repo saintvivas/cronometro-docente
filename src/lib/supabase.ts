@@ -8,6 +8,4 @@ export const supabaseConfigured =
   supabaseUrl.includes("supabase.co") &&
   !!supabaseAnonKey;
 
-export const supabase = supabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
