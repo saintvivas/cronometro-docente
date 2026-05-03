@@ -705,13 +705,9 @@ export async function GET(request: Request) {
 
   applyDatasetFormats(datasetSheet);
 
-  const measurementDetailSheet = XLSX.utils.json_to_sheet(measurementDetailRows);
-  const measurementSummarySheet = XLSX.utils.json_to_sheet(measurementSummaryRows);
   const dictionarySheet = XLSX.utils.json_to_sheet(dictionaryRows);
 
   XLSX.utils.book_append_sheet(workbook, datasetSheet, "Dataset");
-  XLSX.utils.book_append_sheet(workbook, measurementSummarySheet, "Resumen_Medicion");
-  XLSX.utils.book_append_sheet(workbook, measurementDetailSheet, "Detalle_Medicion");
   XLSX.utils.book_append_sheet(workbook, dictionarySheet, "Diccionario");
 
   const buffer = XLSX.write(workbook, {
