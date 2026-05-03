@@ -17,7 +17,9 @@ export default async function EditCoursePage({
               Editar curso registrado
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Modifique la información del curso registrada previamente.
+              Modifique la información del curso registrada previamente. Los cambios se
+              verán reflejados en el selector de cursos y en las futuras exportaciones del
+              dataset.
             </p>
           </div>
 

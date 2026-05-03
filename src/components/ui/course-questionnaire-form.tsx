@@ -479,7 +479,7 @@ export default function CourseQuestionnaireForm({
                 className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
               >
                 <label className="block text-sm font-medium text-slate-900">
-                  {question.number}. {question.label}
+                  {question.displayNumber || question.number}. {question.label}
                   {question.required && (
                     <span className="ml-1 text-red-500">*</span>
                   )}

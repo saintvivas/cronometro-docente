@@ -8,6 +8,7 @@ export type QuestionType =
 export type Question = {
   id: string;
   number: number;
+  displayNumber?: string;
   section: string;
   label: string;
   type: QuestionType;
@@ -33,7 +34,7 @@ export const QUESTIONNAIRE_SECTIONS = [
   },
   {
     id: "D",
-    title: "Sección D: Datos complementarios del esfuerzo",
+    title: "Sección D: Esfuerzo y tiempo invertido durante el periodo académico",
   },
   {
     id: "E",
@@ -227,6 +228,16 @@ export const QUESTIONNAIRE_SCHEMA: Question[] = [
     min: 1,
   },
   {
+    id: "q16_1_tiempo_labor_asignado_semana",
+    number: 16.1,
+    displayNumber: "16.1",
+    section: "B",
+    label: "Tiempo en labor asignado por semana",
+    type: "number",
+    required: true,
+    min: 0,
+  },
+  {
     id: "q17_numero_estudiantes",
     number: 17,
     section: "B",
@@ -373,7 +384,56 @@ export const QUESTIONNAIRE_SCHEMA: Question[] = [
     min: 0,
     max: 100,
   },
-
+  {
+  id: "q30_promedio_semanal_estimado",
+  number: 30,
+  section: "D",
+  label:
+    "Promedio de horas invertidas estimadas a la semana en planificación y diseño del curso",
+  type: "number",
+  required: true,
+  min: 0,
+},
+{
+  id: "q31_promedio_semanal_estimado",
+  number: 31,
+  section: "D",
+  label:
+    "Promedio de horas invertidas estimadas a la semana en el desarrollo de materiales y recursos",
+  type: "number",
+  required: true,
+  min: 0,
+},
+{
+  id: "q32_promedio_semanal_estimado",
+  number: 32,
+  section: "D",
+  label:
+    "Promedio de horas invertidas estimadas a la semana en implementación (subida de materiales, configuración, pruebas, etc.)",
+  type: "number",
+  required: true,
+  min: 0,
+},
+{
+  id: "q33_promedio_semanal_estimado",
+  number: 33,
+  section: "D",
+  label:
+    "Promedio de horas invertidas estimadas a la semana en evaluación",
+  type: "number",
+  required: true,
+  min: 0,
+},
+{
+  id: "q34_promedio_semanal_estimado",
+  number: 34,
+  section: "D",
+  label:
+    "Promedio de horas invertidas estimadas a la semana en comunicación con estudiantes (mensajes, foros, correos, tutorías, retroalimentación, etc.)",
+  type: "number",
+  required: true,
+  min: 0,
+},
   {
     id: "q35_numero_asistentes",
     number: 35,

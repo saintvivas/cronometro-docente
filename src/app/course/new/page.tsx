@@ -11,10 +11,12 @@ export default function NewCoursePage() {
               Registro inicial del curso
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-                En esta sección se registra una sola vez la información general del docente, del curso y 
-                de su contexto académico, incluyendo características como duración, número de estudiantes, 
-                módulos, actividades evaluadas y porcentajes asociados al diseño del curso. Los tiempos dedicados 
-                a planificación, diseño, recursos, implementación, evaluación y comunicación se medirán posteriormente mediante cronómetros asociados al curso registrado.
+                En esta sección se registra una sola vez la información general del docente,
+                del curso y de su contexto académico, incluyendo características como duración,
+                tiempo en labor asignado, número de estudiantes, módulos, actividades evaluadas,
+                porcentajes asociados al diseño del curso y estimaciones iniciales de tiempo
+                semanal. Posteriormente, la aplicación permitirá contrastar estas estimaciones
+                con los tiempos registrados mediante cronómetros.
 
             </p>
           </div>

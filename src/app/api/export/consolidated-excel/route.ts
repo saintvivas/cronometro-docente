@@ -231,15 +231,6 @@ function getDatasetHeaders() {
   ];
 
   for (const question of QUESTIONNAIRE_SCHEMA) {
-    if (question.number === 35) {
-      headers.push(
-        "q30_promedio_semanal_medido",
-        "q31_promedio_semanal_medido",
-        "q32_promedio_semanal_medido",
-        "q33_promedio_semanal_medido",
-        "q34_promedio_semanal_medido"
-      );
-    }
 
     if (question.type === "multiple") {
     for (const option of question.options || []) {
@@ -270,6 +261,27 @@ function getDatasetHeaders() {
     if (question.otherField) {
       headers.push(question.otherField);
     }
+
+    if (question.id === "q30_promedio_semanal_estimado") {
+        headers.push("q30_promedio_semanal_medido");
+    }
+
+    if (question.id === "q31_promedio_semanal_estimado") {
+        headers.push("q31_promedio_semanal_medido");
+    }
+
+    if (question.id === "q32_promedio_semanal_estimado") {
+        headers.push("q32_promedio_semanal_medido");
+    }
+
+    if (question.id === "q33_promedio_semanal_estimado") {
+        headers.push("q33_promedio_semanal_medido");
+    }
+
+    if (question.id === "q34_promedio_semanal_estimado") {
+        headers.push("q34_promedio_semanal_medido");
+    }
+
   }
 
   return headers;
@@ -328,19 +340,6 @@ function buildDictionaryRows() {
 
   for (const question of QUESTIONNAIRE_SCHEMA) {
     // Insertar P30-P34 antes de P35
-    if (question.number === 35) {
-      for (const [parentCode, excelColumn] of Object.entries(TIMER_PARENT_COLUMNS)) {
-        const questionNumber = parentCode.replace("q", "");
-
-        rows.push({
-          "Nombre original (pregunta)": `${questionNumber}. ${excelColumn}`,
-          "Nombre normalizado (columna final)": `${parentCode}_promedio_semanal_medido`,
-          "Tipo": "Numérica",
-          "Rango válido":
-            "Mayor o igual a 0. Calculado como suma de subactividades medidas con cronómetro dividida entre la duración del curso en semanas",
-        });
-      }
-    }
 
     if (question.type === "multiple") {
       for (const option of question.options || []) {
@@ -365,11 +364,31 @@ function buildDictionaryRows() {
     }
 
     rows.push({
-      "Nombre original (pregunta)": `${question.number}. ${question.label}`,
-      "Nombre normalizado (columna final)": question.id,
-      "Tipo": getReadableType(question.type),
-      "Rango válido": getValidRange(question),
+    "Nombre original (pregunta)": `${question.displayNumber || question.number}. ${question.label}`,
+    "Nombre normalizado (columna final)": question.id,
+    "Tipo": getReadableType(question.type),
+    "Rango válido": getValidRange(question),
     });
+
+    const measuredColumnsByEstimatedId: Record<string, string> = {
+    q30_promedio_semanal_estimado: "q30_promedio_semanal_medido",
+    q31_promedio_semanal_estimado: "q31_promedio_semanal_medido",
+    q32_promedio_semanal_estimado: "q32_promedio_semanal_medido",
+    q33_promedio_semanal_estimado: "q33_promedio_semanal_medido",
+    q34_promedio_semanal_estimado: "q34_promedio_semanal_medido",
+    };
+
+    const measuredColumn = measuredColumnsByEstimatedId[question.id];
+
+    if (measuredColumn) {
+    rows.push({
+        "Nombre original (pregunta)": `${question.displayNumber || question.number}. ${question.label.replace("estimadas", "medidas")}`,
+        "Nombre normalizado (columna final)": measuredColumn,
+        "Tipo": "Numérica",
+        "Rango válido":
+        "Mayor o igual a 0. Calculado como suma de subactividades medidas con cronómetro dividida entre la duración del curso en semanas",
+    });
+    }
 
     if (question.otherField) {
       rows.push({
@@ -481,8 +500,10 @@ function applyDatasetFormats(worksheet: XLSX.WorkSheet) {
       if (
         (
           header.includes("promedio_semanal_medido") ||
+          header.includes("promedio_semanal_estimado") ||
           header.includes("total_horas") ||
-          header.includes("tiempo_horas")
+          header.includes("tiempo_horas") ||
+          header.includes("tiempo_labor_asignado_semana")
         ) &&
         isNumber
       ) {
