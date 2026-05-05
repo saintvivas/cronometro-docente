@@ -15,10 +15,17 @@ const TIMER_PARENT_COLUMNS: Record<string, string> = {
 };
 
 function slugify(value: string) {
-  return value
+  const normalized = value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .trim();
+
+  if (["otro", "otra", "otros", "otras"].includes(normalized)) {
+    return "otro";
+  }
+
+  return normalized
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 }
@@ -168,12 +175,23 @@ function buildDatasetRow({
         const legacyOtra = `${question.id}_otra`;
         const legacyOtro = `${question.id}_otro`;
         const legacyOtros = `${question.id}_otros`;
+        const legacyOtras = `${question.id}_otras`;
+
+        const legacyOtraTexto = `${question.id}_otra_texto`;
+        const legacyOtroTexto = `${question.id}_otro_texto`;
+        const legacyOtrosTexto = `${question.id}_otros_texto`;
+        const legacyOtrasTexto = `${question.id}_otras_texto`;
 
         row[question.otherField] = normalizeTextValue(
         answers[question.otherField] ||
+            answers[legacyOtraTexto] ||
+            answers[legacyOtroTexto] ||
+            answers[legacyOtrosTexto] ||
+            answers[legacyOtrasTexto] ||
             answers[legacyOtra] ||
             answers[legacyOtro] ||
             answers[legacyOtros] ||
+            answers[legacyOtras] ||
             ""
         );
         }
@@ -187,12 +205,23 @@ function buildDatasetRow({
     const legacyOtra = `${question.id}_otra`;
     const legacyOtro = `${question.id}_otro`;
     const legacyOtros = `${question.id}_otros`;
+    const legacyOtras = `${question.id}_otras`;
+
+    const legacyOtraTexto = `${question.id}_otra_texto`;
+    const legacyOtroTexto = `${question.id}_otro_texto`;
+    const legacyOtrosTexto = `${question.id}_otros_texto`;
+    const legacyOtrasTexto = `${question.id}_otras_texto`;
 
     row[question.otherField] = normalizeTextValue(
     answers[question.otherField] ||
+        answers[legacyOtraTexto] ||
+        answers[legacyOtroTexto] ||
+        answers[legacyOtrosTexto] ||
+        answers[legacyOtrasTexto] ||
         answers[legacyOtra] ||
         answers[legacyOtro] ||
         answers[legacyOtros] ||
+        answers[legacyOtras] ||
         ""
     );
     }

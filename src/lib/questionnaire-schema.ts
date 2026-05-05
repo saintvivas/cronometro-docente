@@ -294,7 +294,7 @@ export const QUESTIONNAIRE_SCHEMA: Question[] = [
     type: "single",
     required: true,
     options: ["Moodle", "Canvas", "Blackboard", "Google Classroom", "Open edX", "Otra"],
-    otherField: "q21_plataforma_lms_otra",
+    otherField: "q21_plataforma_lms_otro",
   },
   {
     id: "q22_numero_modulos",
@@ -331,7 +331,7 @@ export const QUESTIONNAIRE_SCHEMA: Question[] = [
       "Aprendizaje activo / Colaborativo",
       "Otra",
     ],
-    otherField: "q24_metodologia_principal_otra_texto",
+    otherField: "q24_metodologia_principal_otro_texto",
   },
   {
     id: "q25_numero_actividades_evaluadas",
@@ -512,7 +512,7 @@ export const QUESTIONNAIRE_SCHEMA: Question[] = [
       "Baja conectividad de los estudiantes",
       "Otros",
     ],
-    otherField: "q41_factores_aumentaron_esfuerzo_otros_texto",
+    otherField: "q41_factores_aumentaron_esfuerzo_otro_texto",
   },
   {
     id: "q42_uso_ia_generativa",
